@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    env_file: .env
+    environment:
+      # Only set for the local full-stack dev profile: lets the backend
+      # verify lab challenges server-side via the isolated lab-db. Leave
+      # LAB_DATABASE_URL unset in any hosted/production deployment.
+      LAB_DATABASE_URL: postgresql://lab:lab_dev_only@lab-db:5432/aegis_lab
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+    # Joins lab-net ONLY so it can read lab-db for verification. lab-db,
+    # lab-api, and lab-internal-mock still have no route to any external
+    # network (lab-net is internal: true) — this does not punch a hole in
+    # that isolation, it only lets the trusted backend reach in.
+    networks:
+      - default
+      - lab-net
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    env_file: .env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
+
+  # --- Red Team Laboratory (isolated, never used by the main app) ---
+  lab-api:
+    build: ./lab
+    env_file: .env.lab
+    ports:
+      - "127.0.0.1:8100:8100"
+    depends_on:
+      - lab-db
+      - lab-internal-mock
+    networks:
+      - lab-net
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  lab-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: lab_dev_only
+      POSTGRES_DB: aegis_lab
+    ports:
+      - "127.0.0.1:5433:5432"
+    networks:
+      - lab-net
+    volumes:
+      - lab_db_data:/var/lib/postgresql/data
+
+  # Internal-only mock service used by the SSRF (API7) challenge. Not reachable
+  # from outside lab-net, and carries only synthetic data.
+  lab-internal-mock:
+    build: ./lab/mock-services/internal-metadata
+    environment:
+      SSRF_CHALLENGE_SECRET: lab-ssrf-secret-change-me
+    networks:
+      - lab-net
+    # intentionally no published ports — only reachable from lab-net
+
+networks:
+  lab-net:
+    driver: bridge
+    internal: true   # no route to the external network — enforces SSRF isolation
+
+volumes:
+  lab_db_data:

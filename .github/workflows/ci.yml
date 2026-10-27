@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Run backend unit tests
+        working-directory: backend
+        run: pytest -q tests --ignore=tests/integration
+      - name: openapi.json is up to date with the actual routes
+        working-directory: backend
+        run: |
+          python3 scripts/export_openapi.py
+          git diff --exit-code openapi.json || (
+            echo "::error::backend/openapi.json is stale — run 'python3 backend/scripts/export_openapi.py' and commit the result." && exit 1
+          )
+
+  backend-integration-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: aegis_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Run RLS / tenant-isolation / achievement integration tests
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5434/aegis_test
+        run: pytest -q tests/integration
+
+  lab-regression-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start isolated lab stack
+        run: |
+          cp .env.lab.example .env.lab
+          docker compose up -d lab-db lab-internal-mock lab-api
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Wait for lab API
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8100/healthz && break
+            sleep 2
+          done
+      - name: Seed lab data
+        run: |
+          pip install asyncpg
+          LAB_DATABASE_URL=postgresql://lab:lab_dev_only@localhost:5433/aegis_lab python3 lab/scripts/seed.py
+      - name: Install test deps
+        run: pip install httpx pytest
+      - name: Run vulnerable-vs-hardened regression tests
+        run: pytest -q lab/tests
+      - name: Tear down lab stack
+        if: always()
+        run: docker compose down -v
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm install
+      - name: Type-check and lint
+        working-directory: frontend
+        run: npm run lint

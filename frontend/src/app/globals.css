@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --electric: #3bd1ff;
+}
+
+body {
+  background: radial-gradient(circle at top, #101826 0%, #0b0d12 60%);
+}

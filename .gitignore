@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.lab
+node_modules/
+.next/
+*.log
+*.tsbuildinfo
+.hypothesis/
