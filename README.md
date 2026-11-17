@@ -96,7 +96,7 @@ route/schema definitions — nothing hand-written to drift out of sync:
   ```bash
   python3 backend/scripts/export_openapi.py
   ```
-  Currently covers all 49 paths / 62 route+method combinations across
+  Currently covers all 49 paths / 58 route+method combinations across
   orgs, projects/tasks, documents, API keys, webhooks, challenges, teams,
   leaderboard, achievements, classrooms, and security operations.
 
@@ -163,10 +163,23 @@ taking the platform (never the lab) to production.
 ## Testing
 
 ```bash
-cd backend && pytest -q tests --ignore=tests/integration   # unit tests — passing: 3/3
-cd backend && TEST_DATABASE_URL=... pytest -q tests/integration  # RLS, tenant isolation, achievements, security events, teams/leaderboard/classrooms/orgs/documents/webhooks/projects APIs, + Schemathesis API fuzzing (needs Postgres) — 94 tests
-cd ../lab && pytest -q tests                # 10 vulnerable-vs-hardened regression files (needs the lab stack running)
+# Backend unit tests (no database): 3 tests
+cd backend && pytest -q tests --ignore=tests/integration
+
+# Backend integration tests: 94 tests — RLS, tenant isolation, achievements,
+# security events, teams/leaderboard/classrooms/orgs/documents/webhooks/
+# projects APIs, plus 58 Schemathesis fuzz cases. Needs an EMPTY Postgres
+# database (see the notes below).
+cd backend && TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/aegis_test pytest -q tests/integration
+
+# Lab regression tests: 24 tests in 10 files, against a freshly seeded lab
+pytest -q lab/tests
 ```
+
+The lab tests talk to `LAB_BASE_URL` (default `http://localhost:8100`). The
+SSRF test targets `LAB_INTERNAL_MOCK_URL` (default
+`http://lab-internal-mock:9000`, the Docker hostname); set it if you run
+the lab as plain processes instead of with Docker Compose.
 
 `backend/tests/integration/` runs the real `supabase/migrations/*.sql`
 against a throwaway Postgres (CI spins one up as a service container —
@@ -175,26 +188,36 @@ directly as the `authenticated` role with `request.jwt.claim.sub` set per
 test user — the same mechanism
 PostgREST uses — so these actually exercise the RLS policies, not just
 application code that happens to filter by `org_id` correctly. The
-teams/leaderboard/classrooms tests instead drive the real FastAPI app
-through `TestClient`, with `get_current_user` overridden to a given test
-user (standing in for a verified Supabase JWT) — so these exercise actual
-routing, validation, and the app's own authorization checks end-to-end.
+teams/leaderboard/classrooms/projects/documents/webhooks tests instead
+drive the real FastAPI app through an ASGI client
+(`backend/tests/integration/helpers.py`, run on one dedicated event loop
+so it can share an asyncpg pool), with `get_current_user` overridden to a
+given test user (standing in for a verified Supabase JWT) — so these
+exercise actual routing, validation, and the app's own authorization
+checks end-to-end. The integration database is seeded with the public
+challenge catalog because many tables have foreign keys to it.
 
-CI runs all three suites plus a frontend lint/build on every PR. No test
-result is reported here unless it actually ran. In this development
-environment: the backend unit tests ran and passed (3/3), all 97
-backend tests (3 unit + 94 integration — including Schemathesis's 58
-generated fuzz cases — across 11 test files) collect cleanly
-under pytest (confirming imports/fixtures/async wiring are correct —
-collection alone catches a real class of bugs, e.g. a bad import or a
-fixture that doesn't exist), the full challenge registry
-(all 10) imports cleanly, the lab FastAPI app was exercised directly via
-`TestClient` (no Docker) with requests reaching real route handlers
-through auth and business logic, and the frontend's `npm run build`
-succeeded with zero type/lint errors across all 10 routes. What did
-**not** run here, because neither a live Postgres nor the Docker daemon
-was available: `backend/tests/integration/*` against a real database, and
-`lab/tests/*` end-to-end. Run both yourself before relying on them.
+**Re-running.** Two of the suites are not idempotent, and CI avoids this by
+always starting from a fresh database / fresh lab:
+
+- The integration schema setup fails with `DuplicateTableError` on a
+  database that already has the tables — drop and recreate the test
+  database before each run.
+- The lab suite is stateful: the hardened export endpoint keeps an
+  in-process rate limit (5 requests per minute), so running the lab tests
+  twice within a minute fails `test_hardened_export_caps_at_50`. Reseed and
+  recreate `lab-api` between runs (`./lab/scripts/reset.sh` does this).
+
+**What has actually run.** CI runs the unit, integration and lab suites
+plus a frontend lint, type-check and build on every push to `main` and
+every PR. As of 2026-11-17 all four CI jobs pass (3 unit, 94 integration,
+24 lab tests), and the same counts passed in a local run on Windows
+without Docker (plain processes, PostgreSQL 16.15, Python 3.12). The
+frontend has no tests of its own — CI only lints, type-checks and builds
+it. The end-to-end API1 BOLA walkthrough (attack the vulnerable endpoint,
+submit the flag through the UI, server-side verification, 403 from the
+hardened endpoint) was run by hand, using a local stand-in for Supabase
+auth; it is not automated.
 
 ## Roadmap
 
