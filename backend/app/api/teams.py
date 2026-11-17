@@ -38,6 +38,17 @@ async def _require_member(pool, team_id: UUID, user_id: UUID) -> None:
         raise HTTPException(status_code=403, detail="Not a member of this team")
 
 
+async def require_report_access(pool, report, user_id: UUID) -> None:
+    """A team's report is open to that team's members. A report with no team
+    is open only to its reporter and assignee — previously these checks were
+    skipped entirely for team-less reports, so any signed-in user could read,
+    reassign or retest them by id."""
+    if report["team_id"] is not None:
+        await _require_member(pool, report["team_id"], user_id)
+    elif user_id not in (report["reporter_id"], report["assignee_id"]):
+        raise HTTPException(status_code=403, detail="Not allowed to access this report")
+
+
 @router.post("", response_model=TeamOut, status_code=201)
 async def create_team(body: TeamCreate, user: CurrentUser = Depends(get_current_user)):
     pool = await get_pool()
@@ -190,11 +201,12 @@ async def assign_report(
     report_id: UUID, body: VulnReportAssign, user: CurrentUser = Depends(get_current_user)
 ):
     pool = await get_pool()
-    report = await pool.fetchrow("select team_id from vulnerability_reports where id = $1", report_id)
+    report = await pool.fetchrow(
+        "select team_id, reporter_id, assignee_id from vulnerability_reports where id = $1", report_id
+    )
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report["team_id"] is not None:
-        await _require_member(pool, report["team_id"], user.id)
+    await require_report_access(pool, report, user.id)
     row = await pool.fetchrow(
         "update vulnerability_reports set assignee_id = $1, remediation_status = $2 "
         "where id = $3 returning id, team_id, reporter_id, challenge_id, title, severity, "
@@ -211,11 +223,12 @@ async def retest_report(
     report_id: UUID, body: RetestCreate, user: CurrentUser = Depends(get_current_user)
 ):
     pool = await get_pool()
-    report = await pool.fetchrow("select team_id from vulnerability_reports where id = $1", report_id)
+    report = await pool.fetchrow(
+        "select team_id, reporter_id, assignee_id from vulnerability_reports where id = $1", report_id
+    )
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report["team_id"] is not None:
-        await _require_member(pool, report["team_id"], user.id)
+    await require_report_access(pool, report, user.id)
     async with pool.acquire() as conn:
         async with conn.transaction():
             row = await conn.fetchrow(
@@ -246,8 +259,7 @@ async def export_report_markdown(report_id: UUID, user: CurrentUser = Depends(ge
     )
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
-    if report["team_id"] is not None:
-        await _require_member(pool, report["team_id"], user.id)
+    await require_report_access(pool, report, user.id)
 
     retests = await pool.fetch(
         "select tester_id, result, notes, created_at from retests where report_id = $1 order by created_at",

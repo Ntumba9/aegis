@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     lab_database_url: str = ""
     verification_rate_limit_per_minute: int = 3
 
+    # Server-run lab regression check for vulnerability reports (see
+    # app/services/lab_runner.py). LOCAL DEV ONLY and OFF by default: it makes
+    # the backend send test traffic to a lab instance, so never enable it in a
+    # hosted/production deployment. The target is operator configuration and
+    # is never taken from a request; the host must be loopback or `lab-api`.
+    lab_retest_runner_enabled: bool = False
+    lab_retest_base_url: str = "http://127.0.0.1:8100"
+    lab_retest_timeout_seconds: int = 120
+
     @property
     def cors_allowed_origins(self) -> list[str]:
         return [o.strip() for o in self.cors_allowed_origins_raw.split(",") if o.strip()]

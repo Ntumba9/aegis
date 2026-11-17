@@ -1812,6 +1812,106 @@
         }
       }
     },
+    "/teams/reports/{report_id}/lab-verification": {
+      "post": {
+        "tags": [
+          "lab-verification"
+        ],
+        "summary": "Run Lab Verification",
+        "operationId": "run_lab_verification_teams_reports__report_id__lab_verification_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabRunOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/reports/{report_id}/lab-verifications": {
+      "get": {
+        "tags": [
+          "lab-verification"
+        ],
+        "summary": "List Lab Verifications",
+        "operationId": "list_lab_verifications_teams_reports__report_id__lab_verifications_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Report Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LabRunOut"
+                  },
+                  "title": "Response List Lab Verifications Teams Reports  Report Id  Lab Verifications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/leaderboard/users": {
       "get": {
         "tags": [
@@ -3499,6 +3599,77 @@
           "created_at"
         ],
         "title": "InviteOut"
+      },
+      "LabRunOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "report_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Report Id"
+          },
+          "challenge_id": {
+            "type": "string",
+            "title": "Challenge Id"
+          },
+          "requested_by": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Requested By"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "tests": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tests"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Finished At"
+          },
+          "scope_note": {
+            "type": "string",
+            "title": "Scope Note",
+            "default": "Evidence about the lab's reference implementation (its vulnerable and hardened endpoints), not proof that a team remediated anything. This does not change the report's remediation status."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "report_id",
+          "challenge_id",
+          "requested_by",
+          "outcome",
+          "tests",
+          "duration_ms",
+          "summary",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "LabRunOut"
       },
       "LeaderboardEntry": {
         "properties": {

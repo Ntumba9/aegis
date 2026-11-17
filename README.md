@@ -50,7 +50,38 @@ application: real auth, real tenant isolation, real RLS. **AEGIS Labs**
 (`lab/`) is a separate, deliberately insecure codebase whose only job is to
 be exploitable in a controlled way. The platform backend never runs
 vulnerable code; it only reads lab state to verify challenge completions,
-and only when `LAB_DATABASE_URL` is configured for a local dev stack.
+and only when `LAB_DATABASE_URL` is configured for a local dev stack. The one
+exception is the optional lab verification runner (below), which is off by
+default.
+
+### Lab verification runner (optional, local dev only, off by default)
+
+A team lead can ask the backend to run the lab's own regression test for a
+vulnerability report's challenge (`POST /teams/reports/{id}/lab-verification`)
+and records the real result as `passed`, `failed`, `error` or `unreachable`
+(never collapsed). **This is evidence about the lab's reference
+implementation — its vulnerable and hardened endpoints — not proof that a
+team fixed anything:** users never submit code, so nothing here can test a
+team's own remediation, and a run never changes a report's remediation
+status or its human-declared retests.
+
+It is a test runner inside a server, so it is constrained: each challenge
+maps to one fixed test file in server config (no request value reaches the
+command, path or environment); the child gets a scrubbed environment (no
+database URLs or keys); the lab address comes from server config and must be
+loopback or `lab-api`; raw test output is discarded (it can contain response
+bodies, i.e. flags) and only counts and failing test names are kept; there
+is a timeout, a one-run-at-a-time cap across workers (busy answers 429), a
+per-challenge cooldown (the lab's own rate limiters are stateful) and a
+per-user rate limit. On POSIX the child also gets CPU, memory and file
+rlimits; on Windows it does not, so only the timeout, discarded output and
+scrubbed environment apply there. Enable it with `LAB_RETEST_RUNNER_ENABLED=true`
+(plus `LAB_RETEST_BASE_URL`, default `http://127.0.0.1:8100`, and
+`LAB_RETEST_TIMEOUT_SECONDS`) on a local dev backend only — never in a hosted
+deployment, exactly like `LAB_DATABASE_URL`. It has been exercised against
+the real lab under Docker Compose (2026-11-17, local, synthetic data): a
+team lead's run came back `passed`, an immediate second run was refused by
+the cooldown (429), and the report's remediation status stayed `open`.
 
 **The core multi-tenant SaaS app** (not just the training platform) has
 working endpoints and UI for: organizations + invitations (`/orgs`),
@@ -102,7 +133,7 @@ route/schema definitions — nothing hand-written to drift out of sync:
   ```bash
   python3 backend/scripts/export_openapi.py
   ```
-  Currently covers all 49 paths / 58 route+method combinations across
+  Currently covers all 51 paths / 60 route+method combinations across
   orgs, projects/tasks, documents, API keys, webhooks, challenges, teams,
   leaderboard, achievements, classrooms, and security operations.
 
@@ -148,7 +179,8 @@ leaderboard points**, per the project's anti-cheating requirement.
   "internal" service it reaches is only ever reachable from inside that
   network.
 - The main backend joins `lab-net` *only* to read the lab's Postgres
-  instance for verification — it never calls a vulnerable endpoint itself.
+  instance for verification — it never calls a vulnerable endpoint itself
+  (unless the optional, off-by-default lab verification runner is enabled).
 - Tenant isolation in the main app is enforced twice: explicit `org_id`
   checks in every query (`backend/app/api/`), and Postgres RLS policies
   (`supabase/migrations/0003_rls_policies.sql`) as defense in depth.
@@ -169,12 +201,12 @@ taking the platform (never the lab) to production.
 ## Testing
 
 ```bash
-# Backend unit tests (no database): 3 tests
+# Backend unit tests (no database): 14 tests (11 run the lab runner for real)
 cd backend && pytest -q tests --ignore=tests/integration
 
-# Backend integration tests: 94 tests — RLS, tenant isolation, achievements,
+# Backend integration tests: 117 tests — RLS, tenant isolation, achievements,
 # security events, teams/leaderboard/classrooms/orgs/documents/webhooks/
-# projects APIs, plus 58 Schemathesis fuzz cases. Needs an EMPTY Postgres
+# projects/lab-verification APIs, plus 60 Schemathesis fuzz cases. Needs an EMPTY Postgres
 # database (see the notes below).
 cd backend && TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/aegis_test pytest -q tests/integration
 
@@ -218,8 +250,10 @@ always starting from a fresh database / fresh lab:
 plus a frontend lint, type-check and build on every push to `main` and
 every PR. As of 2026-11-17 all four CI jobs pass (3 unit, 94 integration,
 24 lab tests), and the same counts passed in a local run on Windows
-without Docker (plain processes, PostgreSQL 16.15, Python 3.12). The
-frontend has no tests of its own — CI only lints, type-checks and builds
+without Docker (plain processes, PostgreSQL 16.15, Python 3.12). Later
+work (persisted invites, the lab verification runner) has so far been run
+locally only: 14 unit and 117 integration tests passed there; CI has not
+yet run it. The frontend has no tests of its own — CI only lints, type-checks and builds
 it. The end-to-end API1 BOLA walkthrough (attack the vulnerable endpoint,
 submit the flag through the UI, server-side verification, 403 from the
 hardened endpoint) was run by hand, using a local stand-in for Supabase
@@ -252,10 +286,11 @@ auth; it is not automated.
 
 **What's still thin in Milestone 3:** classroom invite tokens are now
 persisted with expiry and single use (`classroom_invites`, migration
-`0008`). There's no dedicated "Blue Team" defense-verification
-flow beyond recording a `defense`-mode session and a `retest` outcome; a
-defense session doesn't yet auto-run the `lab/tests/` regression suite
-for you.
+`0008`). A retest outcome (`fixed` / `still_vulnerable`) is still
+declared by a person; the optional lab verification runner adds a
+separately recorded, server-run check of the lab's own regression test,
+but it cannot verify a team's own fix (see above), and a defense-mode
+session is not linked to retests or reports.
 
 ## Contributing
 

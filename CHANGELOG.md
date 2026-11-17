@@ -20,6 +20,25 @@ All notable changes to AEGIS are documented here. Format loosely follows
   never expired, and could raise a `KeyError` on concurrent accepts. Four
   new integration tests (persistence across a pool restart, expiry,
   hash-only storage, concurrent accepts).
+- **Lab verification runner** (optional, local dev only, off by default;
+  `LAB_RETEST_RUNNER_ENABLED`): `POST /teams/reports/{id}/lab-verification`
+  runs the lab's own regression test for the report's challenge and
+  records the real outcome — `passed` / `failed` / `error` / `unreachable`,
+  never collapsed — in `retest_lab_runs` (migration `0009`), with
+  started/finished/denied events in `security_events`. It is evidence about
+  the lab's reference implementation, not proof of a team's fix, and never
+  changes a report's status. Controls: fixed per-challenge test-file
+  allowlist, scrubbed child environment, server-configured loopback-only
+  lab address, timeout, one concurrent run across workers (Postgres
+  advisory lock), per-challenge cooldown and per-user rate limit, raw test
+  output discarded (it can contain flags), POSIX-only rlimits. Team leads
+  only (the reporter, for team-less reports). 11 unit and 17 integration
+  tests.
+- Authorization fix: reports with no team were fully open — assign, retest
+  and export skipped every check, so any signed-in user could use them by
+  id. They now require the reporter or assignee. (The RLS policies in
+  `0005`/`0007` still allow team-less reports to any authenticated user via
+  PostgREST; that is not changed here.)
 - Docker Compose now publishes the platform backend (8000) and frontend
   (3000) on `127.0.0.1` by default (previously all interfaces);
   `BACKEND_BIND_ADDR` / `FRONTEND_BIND_ADDR` in `.env` change it. The lab's

@@ -24,8 +24,17 @@ API keys, webhook secrets, challenge progress, team/report data.
   integration tests in `backend/tests/integration/` exercise RLS
   directly, not just the app layer.
 - Backend ↔ AEGIS Labs: the backend reads the **lab's** Postgres instance
-  (`LAB_DATABASE_URL`) only to verify challenge completions. It never
-  calls a lab HTTP endpoint, vulnerable or hardened.
+  (`LAB_DATABASE_URL`) only to verify challenge completions. By default it
+  never calls a lab HTTP endpoint, vulnerable or hardened. The one
+  exception is the optional lab verification runner
+  (`LAB_RETEST_RUNNER_ENABLED`, off by default, local dev only): a team
+  lead can have the backend run one allowlisted lab regression test file
+  against a server-configured loopback / `lab-api` address. Its risks and
+  controls: a test runner inside a server (fixed allowlist, scrubbed child
+  environment, timeout, single concurrent run, cooldown and rate limit,
+  raw output discarded because it can contain flags, POSIX-only rlimits)
+  and the results are evidence about the lab's reference code, not about a
+  team's fix. It must never be enabled in a hosted deployment.
 
 **Key mitigations already in place:**
 - API keys stored as SHA-256 hashes; shown in plaintext exactly once.
@@ -69,7 +78,7 @@ isn't the lab.
 | CPU/memory limits (`deploy.resources.limits`) | A resource-consumption exploit (API4) can't take down the host. |
 | Synthetic data only, generated at seed time | There is nothing sensitive in the lab to actually steal, even if isolation somehow failed. |
 | Separate `.env.lab` / `LAB_JWT_SECRET` | Lab credentials and signing secrets are never shared with the production platform's secrets. |
-| `backend` joins `lab-net` *only* for DB reads | The one bridge between "secure platform" and "insecure lab" is narrow, explicit, and read-only in practice (verification queries only). |
+| `backend` joins `lab-net` *only* for DB reads | The one bridge between "secure platform" and "insecure lab" is narrow, explicit, and read-only in practice (verification queries only), plus the optional, off-by-default lab verification runner described in section 1. |
 
 **Out of scope for the lab's threat model (by design):** every
 vulnerability documented in `backend/app/challenges/*.py::METADATA` is

@@ -33,6 +33,10 @@ WEBHOOK_SIGNING_SECRET
 CORS_ALLOWED_ORIGINS    # comma-separated, e.g. "https://app.example.com" — defaults to localhost:3000 only
 ```
 
+Leave `LAB_RETEST_RUNNER_ENABLED` unset (it defaults to off) in this
+deployment too: it makes the backend run test code and send traffic to a
+lab, which is local-dev only.
+
 Leave `LAB_DATABASE_URL` **unset** in this deployment. Without it,
 challenge submissions are recorded as `local_unverified` and award zero
 leaderboard points — which is the correct, safe behavior for a hosted

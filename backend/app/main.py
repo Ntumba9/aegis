@@ -9,6 +9,7 @@ from app.api import (
     challenges,
     classrooms,
     documents,
+    lab_verification,
     leaderboard,
     orgs,
     projects,
@@ -48,6 +49,7 @@ app.include_router(projects.router)
 app.include_router(api_keys.router)
 app.include_router(challenges.router)
 app.include_router(teams.router)
+app.include_router(lab_verification.router)
 app.include_router(leaderboard.router)
 app.include_router(achievements.router)
 app.include_router(classrooms.router)
