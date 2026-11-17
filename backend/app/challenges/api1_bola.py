@@ -33,8 +33,8 @@ METADATA = ChallengeMetadata(
     prerequisites=["Basic HTTP/REST familiarity", "A REST client (curl, httpie, Postman)"],
     authorized_scope=(
         "You are authorized to test ONLY the lab instance running on your own "
-        "machine at the address printed by `docker compose up lab-api` "
-        "(default http://localhost:8100). Testing any other host is out of scope."
+        "machine at http://localhost:8100 (bound to 127.0.0.1 only). "
+        "Testing any other host is out of scope."
     ),
     required_services=["lab-api", "lab-db"],
     hints=[
