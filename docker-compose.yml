@@ -46,11 +46,14 @@ services:
   lab-api:
     build: ./lab
     env_file: .env.lab
-    ports:
-      - "127.0.0.1:8100:8100"
+    # No `ports:` here on purpose: lab-net is `internal: true`, and Docker
+    # does not publish host ports for containers on an internal network.
+    # The host reaches this service through lab-proxy-api below.
     depends_on:
       - lab-db
       - lab-internal-mock
+      - lab-proxy-api
+      - lab-proxy-db
     networks:
       - lab-net
     deploy:
@@ -65,8 +68,7 @@ services:
       POSTGRES_USER: lab
       POSTGRES_PASSWORD: lab_dev_only
       POSTGRES_DB: aegis_lab
-    ports:
-      - "127.0.0.1:5433:5432"
+    # No `ports:` (see lab-api); reached from the host via lab-proxy-db.
     networks:
       - lab-net
     volumes:
@@ -82,10 +84,46 @@ services:
       - lab-net
     # intentionally no published ports — only reachable from lab-net
 
+  # --- Host access to the isolated lab ---------------------------------------
+  # lab-net has no route out, so its services cannot publish host ports. These
+  # two forwarders sit on BOTH lab-net and lab-edge (a normal network) and are
+  # the only things published, on 127.0.0.1. Each forwards to one fixed
+  # upstream and does nothing else. lab-api / lab-db / lab-internal-mock stay
+  # on lab-net only, so they still have no route to the outside world.
+  lab-proxy-api:
+    build: ./lab/proxy
+    command: ["TCP-LISTEN:8100,fork,reuseaddr", "TCP:lab-api:8100"]
+    ports:
+      - "127.0.0.1:8100:8100"
+    networks:
+      - lab-net
+      - lab-edge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 32M
+
+  lab-proxy-db:
+    build: ./lab/proxy
+    command: ["TCP-LISTEN:5433,fork,reuseaddr", "TCP:lab-db:5432"]
+    ports:
+      - "127.0.0.1:5433:5433"
+    networks:
+      - lab-net
+      - lab-edge
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 32M
+
 networks:
   lab-net:
     driver: bridge
     internal: true   # no route to the external network — enforces SSRF isolation
+  lab-edge:
+    driver: bridge   # normal network; only the two forwarders above join it
 
 volumes:
   lab_db_data:

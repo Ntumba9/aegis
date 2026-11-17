@@ -59,9 +59,6 @@ jobs:
 
   lab-regression-tests:
     runs-on: ubuntu-latest
-    env:
-      # Adds docker-compose.ci.yml (see its header for why).
-      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v4
       - name: Start isolated lab stack
