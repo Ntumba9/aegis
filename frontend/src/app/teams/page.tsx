@@ -68,7 +68,7 @@ export default function TeamsPage() {
             <p className="text-xs uppercase text-slate-500 mt-1">{t.mode}</p>
           </Link>
         ))}
-        {teams.length === 0 && <p className="text-slate-500 text-sm">You're not on a team yet.</p>}
+        {teams.length === 0 && <p className="text-slate-500 text-sm">You&apos;re not on a team yet.</p>}
       </div>
     </main>
   );
