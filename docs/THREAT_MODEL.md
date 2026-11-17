@@ -44,11 +44,11 @@ API keys, webhook secrets, challenge progress, team/report data.
 - Challenge completion is independently re-derived server-side
   (`app/challenges/*.py::verify()`), never trusted from a client boolean.
 
-**Known residual risk:** classroom invite tokens are currently held
-in-process (`app/api/classrooms.py`) rather than persisted, so they don't
-survive a backend restart and don't work across multiple backend
-instances. Low severity (worst case: a valid invite silently expires
-early), tracked for Milestone 4 hardening.
+Classroom invite tokens are persisted in `classroom_invites` (migration
+`0008`): only a SHA-256 of the token is stored, tokens expire after 72
+hours, and each can be used once (a single conditional `UPDATE`, so two
+concurrent accepts cannot both succeed). Integration tests cover
+persistence across a pool restart, expiry, reuse, and the concurrent case.
 
 ## 2. AEGIS Labs (the vulnerable training targets)
 

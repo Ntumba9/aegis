@@ -13,6 +13,13 @@ All notable changes to AEGIS are documented here. Format loosely follows
   `lab/requirements.txt` keeps 0.28.1 (the lab does not depend on supabase).
 
 ### Added (fifth pass)
+- **Persisted classroom invite tokens** (`classroom_invites`, migration
+  `0008`): only a SHA-256 of the token is stored, tokens expire after 72
+  hours, and each is single-use via one atomic conditional `UPDATE`. They
+  previously lived in an in-process dict, so they vanished on restart,
+  never expired, and could raise a `KeyError` on concurrent accepts. Four
+  new integration tests (persistence across a pool restart, expiry,
+  hash-only storage, concurrent accepts).
 - Docker Compose now publishes the platform backend (8000) and frontend
   (3000) on `127.0.0.1` by default (previously all interfaces);
   `BACKEND_BIND_ADDR` / `FRONTEND_BIND_ADDR` in `.env` change it. The lab's

@@ -8,9 +8,12 @@ mirroring supabase/migrations/0005_challenge_platform_rls.sql's
 `is_classroom_instructor`, re-implemented explicitly here because the
 backend connects with a service-role-equivalent connection and bypasses RLS.
 """
+import hashlib
 import secrets
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import asyncpg
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.auth import CurrentUser, get_current_user
@@ -26,10 +29,28 @@ from app.schemas.classrooms import (
 
 router = APIRouter(prefix="/classrooms", tags=["classrooms"])
 
-# In-memory invite tokens -> classroom_id. Good enough for a single-process
-# dev/demo deployment; a production deployment would persist these the
-# same way app/api/orgs.py persists org invitations.
-_invite_tokens: dict[str, UUID] = {}
+# Invite tokens live in the classroom_invites table (migration 0008): only a
+# SHA-256 of the token is stored, tokens expire, and each can be used once.
+INVITE_TTL = timedelta(hours=72)
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+async def consume_invite(conn: asyncpg.Connection, token: str, user_id: UUID) -> UUID | None:
+    """Atomically marks an unused, unexpired invite as used and returns its
+    classroom id, or None if the token is unknown, expired or already used.
+    A single UPDATE ... WHERE used_at IS NULL, so two concurrent accepts of
+    the same token cannot both succeed."""
+    row = await conn.fetchrow(
+        "update classroom_invites set used_at = now(), used_by = $2 "
+        "where token_hash = $1 and used_at is null and expires_at > now() "
+        "returning classroom_id",
+        _hash_token(token),
+        user_id,
+    )
+    return row["classroom_id"] if row else None
 
 
 async def _require_instructor(pool, classroom_id: UUID, user_id: UUID) -> None:
@@ -67,31 +88,43 @@ async def create_invite(classroom_id: UUID, user: CurrentUser = Depends(get_curr
     pool = await get_pool()
     await _require_instructor(pool, classroom_id, user.id)
     token = secrets.token_urlsafe(24)
-    _invite_tokens[token] = classroom_id
-    return {"invite_token": token}
+    expires_at = datetime.now(timezone.utc) + INVITE_TTL
+    await pool.execute(
+        "insert into classroom_invites (classroom_id, token_hash, created_by, expires_at) "
+        "values ($1, $2, $3, $4)",
+        classroom_id,
+        _hash_token(token),
+        user.id,
+        expires_at,
+    )
+    return {"invite_token": token, "expires_at": expires_at.isoformat()}
 
 
 @router.post("/invites/{token}/accept", response_model=StudentOut, status_code=201)
 async def accept_invite(token: str, user: CurrentUser = Depends(get_current_user)):
-    classroom_id = _invite_tokens.get(token)
-    if classroom_id is None:
-        raise HTTPException(status_code=404, detail="Invite not found or already used")
     pool = await get_pool()
-    row = await pool.fetchrow(
-        "insert into classroom_students (classroom_id, student_id) values ($1, $2) "
-        "on conflict (classroom_id, student_id) do nothing "
-        "returning classroom_id, student_id, joined_at",
-        classroom_id,
-        user.id,
-    )
-    del _invite_tokens[token]
-    if row is None:
-        row = await pool.fetchrow(
-            "select classroom_id, student_id, joined_at from classroom_students "
-            "where classroom_id = $1 and student_id = $2",
-            classroom_id,
-            user.id,
-        )
+    async with pool.acquire() as conn:
+        # One transaction: if joining the classroom fails, the token is not burned.
+        async with conn.transaction():
+            classroom_id = await consume_invite(conn, token, user.id)
+            if classroom_id is None:
+                raise HTTPException(
+                    status_code=404, detail="Invite not found, expired, or already used"
+                )
+            row = await conn.fetchrow(
+                "insert into classroom_students (classroom_id, student_id) values ($1, $2) "
+                "on conflict (classroom_id, student_id) do nothing "
+                "returning classroom_id, student_id, joined_at",
+                classroom_id,
+                user.id,
+            )
+            if row is None:
+                row = await conn.fetchrow(
+                    "select classroom_id, student_id, joined_at from classroom_students "
+                    "where classroom_id = $1 and student_id = $2",
+                    classroom_id,
+                    user.id,
+                )
     return dict(row)
 
 

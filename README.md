@@ -250,10 +250,9 @@ auth; it is not automated.
   under the default `docker-compose.yml`. Still open: replacing the `any`
   types in the frontend (currently lint warnings).
 
-**What's still thin in Milestone 3:** classroom invite tokens are
-in-process (`backend/app/api/classrooms.py::_invite_tokens`) rather than
-persisted — fine for a single backend instance, not for multi-instance
-deployment yet. There's no dedicated "Blue Team" defense-verification
+**What's still thin in Milestone 3:** classroom invite tokens are now
+persisted with expiry and single use (`classroom_invites`, migration
+`0008`). There's no dedicated "Blue Team" defense-verification
 flow beyond recording a `defense`-mode session and a `retest` outcome; a
 defense session doesn't yet auto-run the `lab/tests/` regression suite
 for you.
