@@ -10,7 +10,8 @@ services:
       # LAB_DATABASE_URL unset in any hosted/production deployment.
       LAB_DATABASE_URL: postgresql://lab:lab_dev_only@lab-db:5432/aegis_lab
     ports:
-      - "8000:8000"
+      # Loopback by default; set BACKEND_BIND_ADDR in .env to change it.
+      - "${BACKEND_BIND_ADDR:-127.0.0.1}:8000:8000"
     volumes:
       - ./backend:/app
     depends_on:
@@ -28,7 +29,8 @@ services:
     build: ./frontend
     env_file: .env
     ports:
-      - "3000:3000"
+      # Loopback by default; set FRONTEND_BIND_ADDR in .env to change it.
+      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules

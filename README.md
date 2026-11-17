@@ -84,6 +84,12 @@ cd ../frontend && npm install && npm run dev   # from frontend/
 
 Visit `http://localhost:3000`, sign up, and browse the Challenge Catalog.
 
+When the platform runs through Docker Compose, the backend (8000) and
+frontend (3000) are published on `127.0.0.1` only. `BACKEND_BIND_ADDR` and
+`FRONTEND_BIND_ADDR` in `.env` change that (see `.env.example`); they run
+dev servers, so widen them only deliberately. The lab's ports are not
+configurable and always stay on `127.0.0.1`.
+
 ## API documentation
 
 The backend auto-generates OpenAPI 3.1 documentation from its actual
