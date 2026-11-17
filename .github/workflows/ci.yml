@@ -59,6 +59,9 @@ jobs:
 
   lab-regression-tests:
     runs-on: ubuntu-latest
+    env:
+      # Adds docker-compose.ci.yml (see its header for why).
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
     steps:
       - uses: actions/checkout@v4
       - name: Start isolated lab stack
@@ -71,9 +74,13 @@ jobs:
       - name: Wait for lab API
         run: |
           for i in $(seq 1 30); do
-            curl -sf http://localhost:8100/healthz && break
+            curl -sf http://localhost:8100/healthz && exit 0
             sleep 2
           done
+          echo "::error::lab API did not become healthy on http://localhost:8100 within 60s"
+          docker compose ps
+          docker compose logs --no-color
+          exit 1
       - name: Seed lab data
         run: |
           pip install asyncpg
@@ -82,6 +89,9 @@ jobs:
         run: pip install httpx pytest
       - name: Run vulnerable-vs-hardened regression tests
         run: pytest -q lab/tests
+      - name: Lab logs (on failure)
+        if: failure()
+        run: docker compose logs --no-color
       - name: Tear down lab stack
         if: always()
         run: docker compose down -v
@@ -95,7 +105,18 @@ jobs:
           node-version: "22"
       - name: Install frontend deps
         working-directory: frontend
-        run: npm install
-      - name: Type-check and lint
+        run: npm ci
+      - name: Lint
         working-directory: frontend
         run: npm run lint
+      - name: Type-check
+        working-directory: frontend
+        run: npx tsc --noEmit
+      - name: Build
+        working-directory: frontend
+        env:
+          # Placeholders: the build never contacts these.
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+        run: npm run build
