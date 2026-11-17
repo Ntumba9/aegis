@@ -21,9 +21,13 @@ Schemathesis cases), lab regression tests 24/24, and the API1 BOLA
 challenge end to end (attack on the vulnerable endpoint, server-side flag
 verification through the UI, 403 on the hardened endpoint). That run used
 a local stand-in for Supabase auth, not a real Supabase project.
-**Not yet verified:** the GitHub Actions workflow — its only run
-(2026-10-27) failed all four jobs, and it has not been re-run since the
-fixes — and the frontend lint/build.
+**GitHub Actions:** the first run (2026-10-27) failed all four jobs; the
+run on 2026-11-17 (commit `8ae5462`) passed all four — backend unit 3,
+backend integration 94, lab regression 24, and frontend lint, type-check
+and build. CI runs the lab on a non-internal Docker network
+(`docker-compose.ci.yml`); **not yet verified:** the lab with the default
+`docker-compose.yml` (`internal: true` network plus published ports) under
+Docker.
 
 ## Architecture
 
@@ -212,9 +216,9 @@ was available: `backend/tests/integration/*` against a real database, and
   (`docs/THREAT_MODEL.md`), a deployment guide (`docs/DEPLOYMENT.md`),
   and a configurable CORS origin (was hardcoded to `localhost:3000`).
   The Milestone 3 endpoint integration tests and the CHANGELOG now exist.
-  Still open: a green GitHub Actions run (the lab job's service wait and
-  the frontend lint setup still need fixing) and a verified frontend
-  build.
+  CI is green as of 2026-11-17 and the frontend builds. Still open:
+  verifying the lab under the default `docker-compose.yml`, and replacing
+  the `any` types in the frontend (currently lint warnings).
 
 **What's still thin in Milestone 3:** classroom invite tokens are
 in-process (`backend/app/api/classrooms.py::_invite_tokens`) rather than
