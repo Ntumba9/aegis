@@ -59,14 +59,15 @@ export default function ChallengeDetailPage() {
       <section>
         <h2 className="font-semibold text-lg">Local lab setup</h2>
         <pre className="bg-navy/60 border border-slate-800 rounded-lg p-4 text-sm overflow-x-auto mt-2">
-{`git clone https://github.com/your-org/aegis.git
-cd aegis
+{`git clone <repo-url> && cd aegis
 cp .env.lab.example .env.lab
 docker compose up -d lab-db lab-internal-mock lab-api
+pip install asyncpg
 python3 lab/scripts/seed.py`}
         </pre>
         <p className="text-slate-500 text-sm mt-2">
-          Required services: {challenge.required_services.join(", ")}
+          Required services: {challenge.required_services.join(", ")}. The lab listens on
+          http://localhost:8100, bound to 127.0.0.1 only.
         </p>
       </section>
 
