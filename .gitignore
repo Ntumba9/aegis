@@ -8,3 +8,7 @@ node_modules/
 *.log
 *.tsbuildinfo
 .hypothesis/
+
+.tools/
+.venv/
+.run/

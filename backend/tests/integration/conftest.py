@@ -40,6 +40,27 @@ async def _apply_schema(conn: asyncpg.Connection) -> None:
         "grant select, insert, update, delete on all tables in schema public to authenticated"
     )
 
+    # Publish the challenge catalog (public METADATA only), as
+    # scripts/seed_challenges.py does in a real deployment. Many tables
+    # (user_progress, team_sessions, vulnerability_reports, ...) have a
+    # foreign key to challenges(id), so tests need these rows to exist.
+    from app.challenges.registry import all_metadata
+
+    for m in all_metadata():
+        await conn.execute(
+            """
+            insert into challenges (
+                id, owasp_category, title, difficulty, summary,
+                learning_objectives, prerequisites, authorized_scope,
+                required_services, hints, remediation_markdown, points
+            ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+            on conflict (id) do nothing
+            """,
+            m.id, m.owasp_category, m.title, m.difficulty, m.summary,
+            m.learning_objectives, m.prerequisites, m.authorized_scope,
+            m.required_services, m.hints, m.remediation_markdown, m.points,
+        )
+
 
 @pytest_asyncio.fixture(scope="session")
 async def db_pool():
@@ -61,9 +82,14 @@ async def bind_app_db_pool(db_pool):
     duration of the session, so API-layer tests (test_teams_api.py etc.)
     exercise the real endpoint code without needing a real DATABASE_URL."""
     import app.db.session as db_session
+    from tests.integration.helpers import run_in_app_loop
 
-    db_session._pool = db_pool
+    async def _open():
+        return await asyncpg.create_pool(TEST_DATABASE_URL, min_size=1, max_size=5)
+
+    db_session._pool = run_in_app_loop(_open())
     yield
+    run_in_app_loop(db_session._pool.close())
     db_session._pool = None
 
 
