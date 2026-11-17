@@ -60,14 +60,14 @@ async def metrics(
     pool = await get_pool()
 
     total_requests = await pool.fetchval(
-        "select count(*) from request_logs where org_id = $1 and created_at > now() - ($2::text || ' hours')::interval",
+        "select count(*) from request_logs where org_id = $1 and created_at > now() - make_interval(hours => $2)",
         org_id,
         window_hours,
     )
 
     status_rows = await pool.fetch(
         "select status_code, count(*) as c from request_logs "
-        "where org_id = $1 and created_at > now() - ($2::text || ' hours')::interval "
+        "where org_id = $1 and created_at > now() - make_interval(hours => $2) "
         "group by status_code",
         org_id,
         window_hours,
@@ -77,7 +77,7 @@ async def metrics(
     async def _count(event_type: str) -> int:
         return await pool.fetchval(
             "select count(*) from security_events where org_id = $1 and event_type = $2 "
-            "and created_at > now() - ($3::text || ' hours')::interval",
+            "and created_at > now() - make_interval(hours => $3)",
             org_id,
             event_type,
             window_hours,
@@ -85,7 +85,7 @@ async def metrics(
 
     alerts = await pool.fetchval(
         "select count(*) from security_events where org_id = $1 and severity in ('high', 'critical') "
-        "and created_at > now() - ($2::text || ' hours')::interval",
+        "and created_at > now() - make_interval(hours => $2)",
         org_id,
         window_hours,
     )

@@ -1826,6 +1826,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -1873,6 +1875,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -3860,7 +3864,6 @@
             "title": "Severity"
           },
           "metadata": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Metadata"
           },
@@ -4003,7 +4006,6 @@
             "default": "http://localhost:8100"
           },
           "evidence": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Evidence",
             "default": {}

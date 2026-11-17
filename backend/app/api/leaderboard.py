@@ -6,7 +6,7 @@ app/api/challenges.py::submit_challenge) — a local/unverified submission
 is recorded for the user's own history but contributes zero here, per the
 project's anti-cheating requirement.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.db.session import get_pool
 from app.schemas.leaderboard import LeaderboardEntry, TeamLeaderboardEntry
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
 @router.get("/users", response_model=list[LeaderboardEntry])
-async def user_leaderboard(limit: int = 50):
+async def user_leaderboard(limit: int = Query(50, ge=1, le=100)):
     pool = await get_pool()
     rows = await pool.fetch(
         """
@@ -38,7 +38,7 @@ async def user_leaderboard(limit: int = 50):
 
 
 @router.get("/teams", response_model=list[TeamLeaderboardEntry])
-async def team_leaderboard(limit: int = 50):
+async def team_leaderboard(limit: int = Query(50, ge=1, le=100)):
     pool = await get_pool()
     rows = await pool.fetch(
         """
