@@ -51,7 +51,7 @@ METADATA = ChallengeMetadata(
         "4. Apply a short connect/read timeout and cap response size.\n"
         "5. Run the fetcher with no route to internal-only networks at the "
         "infrastructure layer (see `lab-net: internal: true` in docker-compose.yml) "
-        "— see `lab/challenges/api7_ssrf/hardened.py`."
+        "— see `lab/app/routers/ssrf.py::preview_hardened`."
     ),
     points=150,
 )

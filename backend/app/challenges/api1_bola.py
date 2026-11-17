@@ -48,7 +48,7 @@ METADATA = ChallengeMetadata(
         "The hardened handler loads the resource, then checks "
         "`resource.owner_id == current_user.id` (or org membership for "
         "multi-tenant resources) before returning any data — see "
-        "`lab/challenges/api1_bola/hardened.py`. Pair this with Postgres RLS "
+        "`lab/app/routers/bola.py::get_project_hardened`. Pair this with Postgres RLS "
         "as a second line of defense."
     ),
     points=100,
