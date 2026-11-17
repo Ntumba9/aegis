@@ -37,8 +37,11 @@ async def redeem_vulnerable(body: RedeemRequest, user: dict = Depends(get_curren
                 COUPON_VALUE,
                 user["sub"],
             )
+            # on conflict do nothing: the table's (username, code) primary key
+            # would otherwise turn the replay into a 500 instead of the bug.
             await conn.execute(
-                "insert into coupon_redemptions (username, code) values ($1, $2)",
+                "insert into coupon_redemptions (username, code) values ($1, $2) "
+                "on conflict do nothing",
                 user["sub"],
                 body.code,
             )

@@ -7,7 +7,10 @@ import httpx
 import pytest
 
 LAB_URL = os.environ.get("LAB_BASE_URL", "http://localhost:8100")
-INTERNAL_URL = "http://lab-internal-mock:9000/latest/internal-secret"
+INTERNAL_URL = (
+    os.environ.get("LAB_INTERNAL_MOCK_URL", "http://lab-internal-mock:9000")
+    + "/latest/internal-secret"
+)
 
 
 @pytest.fixture(scope="module")
