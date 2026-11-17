@@ -6,15 +6,24 @@ real, intentionally vulnerable services running on your own machine, then
 compare against a hardened implementation and verify your understanding
 with automated tests.
 
-**Status: Milestone 2 (in progress).** Auth, challenge catalog, and
-server-side verification are implemented, and all ten OWASP API Security
-Top 10 (2023) categories now have a working vulnerable + hardened
-implementation pair with a regression test — see [Challenge catalog](#challenge-catalog).
-Teams, leaderboards, achievements, and instructor features (Milestone 3)
-are not yet built — see [Roadmap](#roadmap). Nothing below is claimed as
-done unless it has a test backing it, and the lab regression suite has
-only been verified by static review + compile checks in this environment
-(no Docker available here) — run it yourself before trusting it.
+**Status: Milestone 4 (in progress).** Milestones 1–3 are implemented:
+auth, challenge catalog, server-side verification, all ten OWASP API
+Security Top 10 (2023) categories as vulnerable + hardened pairs with a
+regression test (see [Challenge catalog](#challenge-catalog)), plus teams,
+leaderboards, achievements, and instructor classrooms — see
+[Roadmap](#roadmap). Nothing below is claimed as done unless it has a
+test backing it.
+
+**Verified on 2026-11-17** (one Windows machine, no Docker: plain
+processes, PostgreSQL 16.15, Python 3.12, everything bound to 127.0.0.1):
+backend unit tests 3/3, backend integration tests 94/94 (including 58
+Schemathesis cases), lab regression tests 24/24, and the API1 BOLA
+challenge end to end (attack on the vulnerable endpoint, server-side flag
+verification through the UI, 403 on the hardened endpoint). That run used
+a local stand-in for Supabase auth, not a real Supabase project.
+**Not yet verified:** the GitHub Actions workflow — its only run
+(2026-10-27) failed all four jobs, and it has not been re-run since the
+fixes — and the frontend lint/build.
 
 ## Architecture
 
@@ -191,7 +200,7 @@ was available: `backend/tests/integration/*` against a real database, and
   walkthroughs (`METADATA.remediation_markdown` per challenge). ✅
   Security *reports* now ship as part of Milestone 3's vulnerability-report
   flow rather than a separate dashboard — see below.
-- **Milestone 3** (this release): teams (`/teams`), Red/Blue Team
+- **Milestone 3**: teams (`/teams`), Red/Blue Team
   collaboration (attack/defense team sessions, vulnerability reports,
   assignment, retesting), achievements (auto-awarded server-side on
   verified completions/sessions — never client-settable), leaderboards
@@ -202,9 +211,10 @@ was available: `backend/tests/integration/*` against a real database, and
   integration tests against a real Postgres in CI, a threat model
   (`docs/THREAT_MODEL.md`), a deployment guide (`docs/DEPLOYMENT.md`),
   and a configurable CORS origin (was hardcoded to `localhost:3000`).
-  Still open: integration tests for the Milestone 3 endpoints
-  themselves (teams/leaderboard/classrooms CRUD, as opposed to the RLS
-  layer underneath them), and a CHANGELOG.
+  The Milestone 3 endpoint integration tests and the CHANGELOG now exist.
+  Still open: a green GitHub Actions run (the lab job's service wait and
+  the frontend lint setup still need fixing) and a verified frontend
+  build.
 
 **What's still thin in Milestone 3:** classroom invite tokens are
 in-process (`backend/app/api/classrooms.py::_invite_tokens`) rather than
