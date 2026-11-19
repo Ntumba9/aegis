@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { getSecurityEvents, getSecurityMetrics } from "@/lib/api";
+import { downloadSecurityEventsCsv, getSecurityEvents, getSecurityMetrics } from "@/lib/api";
 
 export default function SecurityOpsPage() {
   const params = useParams<{ id: string }>();
@@ -30,6 +30,12 @@ export default function SecurityOpsPage() {
           Every number here comes from real request/event logs — nothing is fabricated. Admin/owner only.
         </p>
         {error && <p className="text-red-400 mt-2">{error}</p>}
+        <button
+          onClick={() => downloadSecurityEventsCsv(params.id).catch((e: any) => setError(e.message))}
+          className="mt-4 border border-slate-700 hover:border-slate-500 rounded-lg px-4 py-2 text-sm"
+        >
+          Export events as CSV
+        </button>
       </div>
 
       {metrics && (
