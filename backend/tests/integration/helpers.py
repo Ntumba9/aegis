@@ -17,7 +17,7 @@ from uuid import UUID
 
 import httpx
 
-from app.core.auth import CurrentUser, get_current_user
+from app.core.auth import CurrentUser, get_current_principal, get_current_user
 from app.main import app as fastapi_app
 
 _app_loop = asyncio.new_event_loop()
@@ -76,4 +76,7 @@ def client_as(user_id: UUID) -> SyncAppClient:
         return CurrentUser(id=user_id, email=None)
 
     fastapi_app.dependency_overrides[get_current_user] = _override
+    # Endpoints accepting either identity depend on get_current_principal;
+    # override it too so client_as keeps working for them.
+    fastapi_app.dependency_overrides[get_current_principal] = _override
     return SyncAppClient()

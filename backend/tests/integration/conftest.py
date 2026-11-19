@@ -103,7 +103,7 @@ async def clean_db(db_pool):
             "teams, team_members, team_sessions, vulnerability_reports, retests, "
             "classrooms, classroom_students, classroom_assignments, "
             "user_progress, achievements, user_achievements, "
-            "security_events, request_logs restart identity cascade"
+            "security_events, request_logs, api_keys restart identity cascade"
         )
     yield db_pool
 

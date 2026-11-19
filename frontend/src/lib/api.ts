@@ -168,6 +168,26 @@ export const testWebhook = (orgId: string, webhookId: string) =>
   apiFetch(`/orgs/${orgId}/webhooks/${webhookId}/test`, { method: "POST" });
 
 export const getSecurityEvents = (orgId: string) => apiFetch(`/orgs/${orgId}/security/events`);
+export async function downloadSecurityEventsCsv(orgId: string) {
+  const supabase = getSupabaseBrowserClient();
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(`${API_URL}/orgs/${orgId}/security/events/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(body.detail || `Request failed: ${res.status}`);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `aegis-security-events-${orgId}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const getSecurityMetrics = (orgId: string, windowHours = 24) =>
   apiFetch(`/orgs/${orgId}/security/metrics?window_hours=${windowHours}`);
 

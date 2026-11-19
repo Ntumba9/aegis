@@ -7,12 +7,14 @@ Every number here comes from `request_logs` / `security_events`, written
 by `app/middleware/security_logging.py` on every real request — nothing
 on this page is a fabricated statistic.
 """
+import csv
+import io
 import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
-from app.core.auth import CurrentUser, RequireRole
+from app.core.auth import ApiKeyPrincipal, CurrentUser, RequireReadAccess
 from app.db.session import get_pool
 from app.schemas.security import SecurityEventOut, SecurityMetrics
 
@@ -24,7 +26,7 @@ async def list_events(
     org_id: UUID,
     limit: int = 50,
     severity: str | None = None,
-    user: CurrentUser = Depends(RequireRole("admin")),
+    principal: CurrentUser | ApiKeyPrincipal = Depends(RequireReadAccess("admin")),
 ):
     pool = await get_pool()
     if severity:
@@ -55,7 +57,7 @@ async def list_events(
 async def metrics(
     org_id: UUID,
     window_hours: int = 24,
-    user: CurrentUser = Depends(RequireRole("admin")),
+    principal: CurrentUser | ApiKeyPrincipal = Depends(RequireReadAccess("admin")),
 ):
     pool = await get_pool()
 
@@ -98,4 +100,61 @@ async def metrics(
         rate_limit_violations=await _count("rate_limit_exceeded"),
         alerts=alerts or 0,
         requests_by_status=requests_by_status,
+    )
+
+
+
+@router.get("/events/export")
+async def export_events(
+    org_id: UUID,
+    severity: str | None = None,
+    limit: int = 1000,
+    principal: CurrentUser | ApiKeyPrincipal = Depends(RequireReadAccess("admin")),
+):
+    """The same security-event feed as GET /events, as a CSV download for
+    offline review. Same identity rules (admin/owner JWT, or an org API key
+    with the read scope), same filters, capped at 5000 rows per export."""
+    limit = max(1, min(limit, 5000))
+    pool = await get_pool()
+    if severity:
+        rows = await pool.fetch(
+            "select id, actor_id, event_type, severity, metadata, created_at "
+            "from security_events where org_id = $1 and severity = $2 "
+            "order by created_at desc limit $3",
+            org_id,
+            severity,
+            limit,
+        )
+    else:
+        rows = await pool.fetch(
+            "select id, actor_id, event_type, severity, metadata, created_at "
+            "from security_events where org_id = $1 order by created_at desc limit $2",
+            org_id,
+            limit,
+        )
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["id", "created_at", "event_type", "severity", "actor_id", "metadata"])
+    for r in rows:
+        metadata = r["metadata"]
+        if not isinstance(metadata, str):
+            metadata = json.dumps(metadata)
+        writer.writerow(
+            [
+                str(r["id"]),
+                r["created_at"].isoformat(),
+                r["event_type"],
+                r["severity"],
+                str(r["actor_id"]) if r["actor_id"] else "",
+                metadata,
+            ]
+        )
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="aegis-security-events-{org_id}.csv"'
+        },
     )

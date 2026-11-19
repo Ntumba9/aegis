@@ -5,6 +5,32 @@ All notable changes to AEGIS are documented here. Format loosely follows
 
 ## [Unreleased] — Milestone 4
 
+### Added (sixth pass)
+- **Hardened RLS for team-less vulnerability reports and retests**
+  (migration `0010`): the `0005` policies used
+  `team_id is null or is_team_member(team_id)`, so any authenticated user
+  could read or edit a report with no team through PostgREST — the
+  application-layer fix did not close the direct-PostgREST path. Team-less
+  reports are now restricted to their reporter and assignee; team reports
+  stay team-member-only. Five new RLS regression tests connect as the
+  `authenticated` role and prove the closed cases (hidden, not updatable,
+  retests follow the parent) and the kept cases (reporter, assignee, team
+  member). Verified the tests fail without `0010`.
+- **API-key authentication for read-only org endpoints**: keys created in
+  the dashboard (`aegis_...`, SHA-256 stored) now actually authenticate
+  `GET /orgs/{id}/projects`, `GET /orgs/{id}/security/events` and
+  `/security/metrics` as `Authorization: Bearer <key>`. The key must be
+  active, belong to the org, and carry the `read` scope; use is stamped
+  in `last_used_at`. Write and key-management endpoints remain JWT-only —
+  a key presented there fails like any invalid token. Seven new
+  integration tests cover the 200/404/403/401 paths, `last_used_at`, and
+  that keys cannot write.
+- **Security events CSV export** (`GET /orgs/{id}/security/events/export`,
+  admin/owner JWT or read-scoped key, capped at 5000 rows) plus an
+  "Export events as CSV" button on the security-ops dashboard. Two new
+  integration tests (CSV contents via API key; employee 403 / owner 200
+  on the JWT path).
+
 ### Changed
 - `backend/requirements.txt`: `httpx` pinned to 0.27.2 (was 0.28.1).
   `supabase==2.10.0` requires `httpx<0.28`, so the old pin made

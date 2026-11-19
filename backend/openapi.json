@@ -2583,6 +2583,79 @@
         }
       }
     },
+    "/orgs/{org_id}/security/events/export": {
+      "get": {
+        "tags": [
+          "security-ops"
+        ],
+        "summary": "Export Events",
+        "description": "The same security-event feed as GET /events, as a CSV download for\noffline review. Same identity rules (admin/owner JWT, or an org API key\nwith the read scope), same filters, capped at 5000 rows per export.",
+        "operationId": "export_events_orgs__org_id__security_events_export_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1000,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/orgs/{org_id}/documents": {
       "post": {
         "tags": [
