@@ -86,7 +86,7 @@ the cooldown (429), and the report's remediation status stayed `open`.
 **The core multi-tenant SaaS app** (not just the training platform) has
 working endpoints and UI for: organizations + invitations (`/orgs`),
 projects + tasks, document upload/download via Supabase Storage
-(`/orgs/{id}/documents`), API key generation/rotation/revocation,
+(`/orgs/{id}/documents`), API key generation/rotation/revocation (keys authenticate the read-only org endpoints, with scope enforcement and last-used tracking), CSV export of the security event feed,
 signed-webhook registration + test delivery, and the Blue Team security
 operations dashboard (`/orgs/{id}/security`) — all under one tabbed
 dashboard at `/orgs/{id}` in the frontend.
@@ -133,7 +133,7 @@ route/schema definitions — nothing hand-written to drift out of sync:
   ```bash
   python3 backend/scripts/export_openapi.py
   ```
-  Currently covers all 51 paths / 60 route+method combinations across
+  Currently covers all 52 paths / 61 route+method combinations across
   orgs, projects/tasks, documents, API keys, webhooks, challenges, teams,
   leaderboard, achievements, classrooms, and security operations.
 
@@ -184,7 +184,7 @@ leaderboard points**, per the project's anti-cheating requirement.
 - Tenant isolation in the main app is enforced twice: explicit `org_id`
   checks in every query (`backend/app/api/`), and Postgres RLS policies
   (`supabase/migrations/0003_rls_policies.sql`) as defense in depth.
-- API keys are stored as SHA-256 hashes; plaintext is shown exactly once.
+- API keys are stored as SHA-256 hashes; plaintext is shown exactly once. A key authenticates only the read-only org endpoints, only for its own org, and only with the `read` scope; everything else still requires a user JWT.
 - Webhooks are HMAC-signed with a replay window (`backend/app/services/webhooks.py`).
 - Every request is logged, and every 401/403/429 response is additionally
   recorded as a `security_events` row (`backend/app/middleware/security_logging.py`)
@@ -204,8 +204,9 @@ taking the platform (never the lab) to production.
 # Backend unit tests (no database): 14 tests (11 run the lab runner for real)
 cd backend && pytest -q tests --ignore=tests/integration
 
-# Backend integration tests: 117 tests — RLS, tenant isolation, achievements,
-# security events, teams/leaderboard/classrooms/orgs/documents/webhooks/
+# Backend integration tests: 131 tests — RLS, tenant isolation, achievements,
+# security events + CSV export, API-key auth, team-less report RLS, teams/
+# leaderboard/classrooms/orgs/documents/webhooks/
 # projects/lab-verification APIs, plus 60 Schemathesis fuzz cases. Needs an EMPTY Postgres
 # database (see the notes below).
 cd backend && TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/aegis_test pytest -q tests/integration
@@ -251,9 +252,11 @@ plus a frontend lint, type-check and build on every push to `main` and
 every PR. As of 2026-11-17 all four CI jobs pass (3 unit, 94 integration,
 24 lab tests), and the same counts passed in a local run on Windows
 without Docker (plain processes, PostgreSQL 16.15, Python 3.12). Later
-work (persisted invites, the lab verification runner) has so far been run
-locally only: 14 unit and 117 integration tests passed there; CI has not
-yet run it. The frontend has no tests of its own — CI only lints, type-checks and builds
+work (persisted invites, the lab verification runner, report-RLS
+hardening, API-key auth, CSV export) has so far been run locally only;
+CI has not yet run it. On 2026-11-19, 14 unit and 131 integration tests
+passed on Linux (Python 3.10, PostgreSQL 14 — not the usual 16, noted as
+an environment difference, not a claimed equivalence). The frontend has no tests of its own — CI only lints, type-checks and builds
 it. The end-to-end API1 BOLA walkthrough (attack the vulnerable endpoint,
 submit the flag through the UI, server-side verification, 403 from the
 hardened endpoint) was run by hand, using a local stand-in for Supabase
