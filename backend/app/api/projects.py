@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.auth import CurrentUser, RequireRole, get_current_user
+from app.core.auth import ApiKeyPrincipal, CurrentUser, RequireReadAccess, RequireRole, get_current_user
 from app.db.session import get_pool
 from app.schemas.common import Page
 from app.schemas.projects import (
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/orgs/{org_id}/projects", tags=["projects"])
 async def list_projects(
     org_id: UUID,
     page: Page = Depends(),
-    user: CurrentUser = Depends(RequireRole("employee")),
+    principal: CurrentUser | ApiKeyPrincipal = Depends(RequireReadAccess("employee")),
 ):
     pool = await get_pool()
     rows = await pool.fetch(
